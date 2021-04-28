@@ -29,7 +29,7 @@
 
 namespace velodyne_pointcloud
 {
-class Interpolate : public rclcpp::Node 
+class Interpolate : public rclcpp::Node
 {
 public:
   Interpolate(const rclcpp::NodeOptions & options);

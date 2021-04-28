@@ -47,6 +47,11 @@ pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr interpolate(
   const std::deque<geometry_msgs::msg::TwistStamped> & twist_queue,
   const tf2::Transform & tf2_base_link_to_sensor);
 
+void interpolate(
+  pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT> & input_pointcloud,
+  const std::deque<geometry_msgs::msg::TwistStamped> & twist_queue,
+  const tf2::Transform & tf2_base_link_to_sensor);
+
 pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr sortRingNumber(
   const pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::ConstPtr & input_pointcloud,
   const size_t num_lasers);

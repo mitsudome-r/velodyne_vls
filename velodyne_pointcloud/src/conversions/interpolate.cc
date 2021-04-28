@@ -62,25 +62,26 @@ void Interpolate::processPoints(
 
   pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr points_xyziradt(
     new pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>);
-  pcl::fromROSMsg(*points_xyziradt_msg, *points_xyziradt);
+  pcl::moveFromROSMsg(*points_xyziradt_msg, *points_xyziradt);
 
   pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr interpolate_points_xyziradt(
     new pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>);
   tf2::Transform tf2_base_link_to_sensor;
   getTransform(points_xyziradt->header.frame_id, base_link_frame_, &tf2_base_link_to_sensor);
   interpolate_points_xyziradt = interpolate(points_xyziradt, twist_queue_, tf2_base_link_to_sensor);
+  // interpolate(points_xyziradt, twist_queue_, tf2_base_link_to_sensor);
 
-  if (velodyne_points_interpolate_pub_->get_subscription_count() > 0) {
-    const auto interpolate_points_xyzir = convert(interpolate_points_xyziradt);
-    auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
-    pcl::toROSMsg(*interpolate_points_xyzir, *ros_pc_msg_ptr);
-    velodyne_points_interpolate_pub_->publish(std::move(ros_pc_msg_ptr));
-  }
-  if (velodyne_points_interpolate_ex_pub_->get_subscription_count() > 0) {
-    auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
-    pcl::toROSMsg(*interpolate_points_xyziradt, *ros_pc_msg_ptr);
-    velodyne_points_interpolate_ex_pub_->publish(std::move(ros_pc_msg_ptr));
-  }
+  // if (velodyne_points_interpolate_pub_->get_subscription_count() > 0) {
+  //   const auto interpolate_points_xyzir = convert(points_xyziradt);
+  //   auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
+  //   pcl::toROSMsg(*interpolate_points_xyzir, *ros_pc_msg_ptr);
+  //   velodyne_points_interpolate_pub_->publish(std::move(ros_pc_msg_ptr));
+  // }
+  // if (velodyne_points_interpolate_ex_pub_->get_subscription_count() > 0) {
+  //   auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
+  //   pcl::toROSMsg(*points_xyziradt, *ros_pc_msg_ptr);
+  //   velodyne_points_interpolate_ex_pub_->publish(std::move(ros_pc_msg_ptr));
+  // }
 }
 
 bool Interpolate::getTransform(

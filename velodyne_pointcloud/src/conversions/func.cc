@@ -242,6 +242,94 @@ pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr interpolate(
   return output_pointcloud;
 }
 
+void interpolate(
+  pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT> & input_pointcloud,
+  const std::deque<geometry_msgs::msg::TwistStamped> & twist_queue,
+  const tf2::Transform & tf2_base_link_to_sensor)
+{
+  // pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr output_pointcloud(
+  //   new pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>);
+  // output_pointcloud->reserve(input_pointcloud->points.size());
+
+  if (input_pointcloud.points.empty() || twist_queue.empty()) {
+    auto ros_clock = rclcpp::Clock(RCL_ROS_TIME);
+    RCLCPP_WARN_STREAM_THROTTLE(rclcpp::get_logger("velodyne_interpolate"), ros_clock, 10000 /* ms */, "input_pointcloud.points or twist_queue is empty.");
+    // *output_pointcloud = *input_pointcloud;
+    // return output_pointcloud;
+    return;
+  }
+
+  float theta = 0;
+  float x = 0, y = 0;
+
+  auto twist_it = std::lower_bound(
+    std::begin(twist_queue), std::end(twist_queue),
+    rclcpp::Time(input_pointcloud.points.front().time_stamp, RCL_ROS_TIME),
+    [](const geometry_msgs::msg::TwistStamped & x, rclcpp::Time t) { return rclcpp::Time(x.header.stamp) < t; });
+  twist_it = twist_it == std::end(twist_queue) ? std::end(twist_queue) - 1 : twist_it;
+
+  const tf2::Transform tf2_base_link_to_sensor_inv = tf2_base_link_to_sensor.inverse();
+  for (auto & p : input_pointcloud.points) {
+    for (; (twist_it != std::end(twist_queue) - 1 && p.time_stamp > rclcpp::Time(twist_it->header.stamp).seconds());
+         ++twist_it) {
+      // std::cout << std::fixed << p.time_stamp << " " << rclcpp::Time(twist_it->header.stamp).seconds() << std::endl;
+    }
+
+    float v = twist_it->twist.linear.x;
+    float w = twist_it->twist.angular.z;
+
+    if (std::fabs(p.time_stamp - rclcpp::Time(twist_it->header.stamp).seconds()) > 0.1) {
+      auto ros_clock = rclcpp::Clock(RCL_ROS_TIME);
+      RCLCPP_WARN_STREAM_THROTTLE(rclcpp::get_logger("velodyne_interpolate"), ros_clock, 10000 /* ms */, "Twist time_stamp is too late. Cloud not interpolate.");
+      v = 0;
+      w = 0;
+    }
+
+    static double prev_time_stamp = p.time_stamp;
+    const float time_offset = static_cast<float>(p.time_stamp - prev_time_stamp);
+
+    tf2::Vector3 sensorTF_point(p.x, p.y, p.z);
+
+    tf2::Vector3 base_linkTF_point;
+    base_linkTF_point = tf2_base_link_to_sensor_inv * sensorTF_point;
+
+    theta += w * time_offset;
+    tf2::Quaternion baselink_quat;
+    baselink_quat.setRPY(0.0, 0.0, theta);
+    const float dis = v * time_offset;
+    x += dis * std::cos(theta);
+    y += dis * std::sin(theta);
+
+    tf2::Transform baselinkTF_odom;
+    baselinkTF_odom.setOrigin(tf2::Vector3(x, y, 0));
+    baselinkTF_odom.setRotation(baselink_quat);
+
+    tf2::Vector3 base_linkTF_trans_point;
+    base_linkTF_trans_point = baselinkTF_odom * base_linkTF_point;
+
+    tf2::Vector3 sensorTF_trans_point;
+    sensorTF_trans_point = tf2_base_link_to_sensor * base_linkTF_trans_point;
+
+    // velodyne_pointcloud::PointXYZIRADT tmp_p;
+    p.x = sensorTF_trans_point.getX();
+    p.y = sensorTF_trans_point.getY();
+    p.z = sensorTF_trans_point.getZ();
+    // tmp_p.intensity = p.intensity;
+    // tmp_p.ring = p.ring;
+    // tmp_p.azimuth = p.azimuth;
+    // tmp_p.distance = p.distance;
+    // tmp_p.time_stamp = p.time_stamp;
+    // output_pointcloud->points.push_back(tmp_p);
+
+    prev_time_stamp = p.time_stamp;
+  }
+  // output_pointcloud->header = input_pointcloud->header;
+  // output_pointcloud->height = 1;
+  // output_pointcloud->width = output_pointcloud->points.size();
+  // return output_pointcloud;
+  return;
+}
+
 pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::Ptr sortRingNumber(
   const pcl::PointCloud<velodyne_pointcloud::PointXYZIRADT>::ConstPtr & input_pointcloud,
   const size_t num_lasers)
